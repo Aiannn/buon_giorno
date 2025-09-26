@@ -1,53 +1,36 @@
-import 'package:flame/components.dart';
-import 'package:flame/events.dart';
-import 'package:flame_forge2d/flame_forge2d.dart';
-// import 'core/game_config.dart';
-// import 'components/bonjorno.dart';
-// import 'components/box_stack.dart';
-// import 'components/terrain/terrain_manager.dart';
+import 'package:flame_forge2d/flame_forge2d.dart'; // Forge2DGame
+import 'components/buon_giorno.dart'; // твой BuonGiorno
 
-class BuonGiornoGame extends Forge2DGame with TapDetector {
-  // BuonGiornoGame() : super(gravity: Vector2(0, 20.0), zoom: 12.0);
+class BuonGiornoGame extends Forge2DGame {
+  BuonGiornoGame()
+    : super(
+        gravity: Vector2(
+          0,
+          20,
+        ), // для кинематического тела не важно; оставим дефолт
+        zoom: 14, // масштаб камеры (приближение)
+      );
 
-  // final config = const GameConfig();
-  // late final Bonjorno bonjorno;
-  // late final BoxStack boxStack;
-  // late final TerrainManager terrain;
+  late final BuonGiorno player;
 
-  // @override
-  // Future<void> onLoad() async {
-  //   await super.onLoad();
+  @override
+  Future<void> onLoad() async {
+    await super.onLoad();
 
-  //   bonjorno = Bonjorno(config: config);
-  //   await add(bonjorno);
+    // 1) Добавляем только игрока.
+    player = BuonGiorno(
+      // spritePath: 'assets/images/bon_giorno.png', // оставь закомментированным, если спрайт не подключил
+    );
+    await add(player);
 
-  //   boxStack = BoxStack(
-  //     config: config,
-  //     anchorBodyProvider: () => bonjorno.body,
-  //   );
-  //   await add(boxStack);
+    // 2) Хочешь видеть, как прямоугольник ЕДЕТ вправо через экран — НЕ следуй камерой:
+    // (оставь эти две строки закомментированными)
+    // camera.follow(
+    //   player,
+    //   worldBounds: const Rect.fromLTWH(-100000, -1000, 200000, 4000),
+    // );
+    // camera.setRelativeOffset(Vector2(0.30, 0.5));
 
-  //   terrain = TerrainManager(config: config);
-  //   await add(terrain);
-
-  //   camera.follow(bonjorno, worldBounds: Rect.fromLTWH(-1000, -200, 1e9, 1000));
-  //   camera.setRelativeOffset(Vector2(config.cameraOffsetX, 0.5));
-  // }
-
-  // @override
-  // void update(double dt) {
-  //   super.update(dt);
-  //   // авто-движение вправо (поддержка скорости)
-  //   final v = bonjorno.body.linearVelocity;
-  //   bonjorno.body.linearVelocity = Vector2(config.playerSpeed, v.y);
-
-  //   // уклон под игроком (оценка из TerrainManager)
-  //   final slope = terrain.slopeAtX(bonjorno.body.position.x); // тангенс угла
-  //   boxStack.applyBalance(dt, slope: slope); // мотор/импульсы к шарниру
-  // }
-
-  // @override
-  // void onTapDown(TapDownInfo info) {
-  //   boxStack.onTap();
-  // }
+    // Если позже захочешь держать героя слева — просто раскомментируй код выше.
+  }
 }
