@@ -4,10 +4,10 @@ import 'package:flame/flame.dart';
 import 'package:flame_forge2d/flame_forge2d.dart';
 
 // ====== Топ-левел "конфиг" для BuonGiorno ======
-const double kBonWidth = 0.6; // м
-const double kBonHeight = 1.2; // м
+const double kBonWidth = 60; // м
+const double kBonHeight = 120; // м
 const double kBonSpeedX = 5.0; // м/с вправо
-final Vector2 kBonStart = Vector2(-10, 0); // стартовая позиция
+final Vector2 kBonStart = Vector2(50, 0); // стартовая позиция
 const Color kBonColor = Color(0xFF4FC3F7); // цвет заглушки
 
 /// MVP: кинематический BuonGiorno, едет вправо с постоянной скоростью.
@@ -39,6 +39,11 @@ class BuonGiorno extends BodyComponent {
         paint: Paint()..color = kBonColor,
       );
     }
+
+    // ВАЖНО: локально к телу, центр в (0,0)
+    _visual.position = Vector2.zero();
+    // угол ребёнка 0: родитель уже вращает канвас под угол тела
+    _visual.angle = 0;
 
     add(_visual);
   }
@@ -72,10 +77,14 @@ class BuonGiorno extends BodyComponent {
     super.update(dt);
     // Постоянная скорость вправо в метрах/сек
     body.linearVelocity = Vector2(kBonSpeedX, 0);
+    // НИЧЕГО не синхронизируем для _visual здесь!
+  }
 
-    // Синхронизируем визуал с физическим телом
-    _visual
-      ..position = body.worldCenter
-      ..angle = body.angle;
+  @override
+  void render(Canvas canvas) {
+    // НИЧЕГО не синхронизируем для _visual здесь тоже!
+    super.render(
+      canvas,
+    ); // белая форма + затем дети (уже с обновлёнными позицией/углом)
   }
 }
