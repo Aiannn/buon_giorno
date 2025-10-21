@@ -4,16 +4,16 @@ import 'package:flame/flame.dart';
 import 'package:flame_forge2d/flame_forge2d.dart';
 
 // ====== Топ-левел "конфиг" для BuonGiorno ======
-const double kBonWidth = 60; // м
-const double kBonHeight = 120; // м
+const double kBonWidth = 80; // м
+const double kBonHeight = 100; // м
 const double kBonSpeedX = 5.0; // м/с вправо
-final Vector2 kBonStart = Vector2(50, 0); // стартовая позиция
+final Vector2 kBonStart = Vector2(200, 0); // стартовая позиция
 const Color kBonColor = Color(0xFF4FC3F7); // цвет заглушки
 
 /// MVP: кинематический BuonGiorno, едет вправо с постоянной скоростью.
 /// Никаких зависимостей от Terrain/Config — один файл, один класс.
 class BuonGiorno extends BodyComponent {
-  BuonGiorno({this.spritePath});
+  BuonGiorno({this.spritePath = "buongiorno.webp"});
 
   /// Путь к ассету (например, 'assets/images/bon_giorno.png').
   final String? spritePath;
