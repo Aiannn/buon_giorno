@@ -6,14 +6,17 @@ import 'package:flame_forge2d/flame_forge2d.dart';
 // ====== Топ-левел "конфиг" для BuonGiorno ======
 const double kBonWidth = 80; // м
 const double kBonHeight = 100; // м
-const double kBonSpeedX = 5.0; // м/с вправо
-final Vector2 kBonStart = Vector2(200, 0); // стартовая позиция
+const double kBonSpeedX = 10.0; // м/с вправо
+final Vector2 kBonStart = Vector2(
+  0,
+  (kBonHeight / 2 + 0.05),
+); // стартовая позиция (центр тела на 0.05м выше поверхности)
 const Color kBonColor = Color(0xFF4FC3F7); // цвет заглушки
 
 /// MVP: кинематический BuonGiorno, едет вправо с постоянной скоростью.
 /// Никаких зависимостей от Terrain/Config — один файл, один класс.
 class BuonGiorno extends BodyComponent {
-  BuonGiorno({this.spritePath = "buongiorno.webp"});
+  BuonGiorno({this.spritePath});
 
   /// Путь к ассету (например, 'assets/images/bon_giorno.png').
   final String? spritePath;
@@ -53,7 +56,7 @@ class BuonGiorno extends BodyComponent {
     // КИНЕМАТИЧЕСКОЕ тело: не подчиняется силам/гравитации, двигается как зададим.
     final def =
         BodyDef()
-          ..type = BodyType.kinematic
+          ..type = BodyType.dynamic
           ..position = kBonStart
           ..fixedRotation = true;
 
@@ -76,7 +79,7 @@ class BuonGiorno extends BodyComponent {
   void update(double dt) {
     super.update(dt);
     // Постоянная скорость вправо в метрах/сек
-    body.linearVelocity = Vector2(kBonSpeedX, 0);
+    body.linearVelocity = Vector2(kBonSpeedX, body.linearVelocity.y);
     // НИЧЕГО не синхронизируем для _visual здесь!
   }
 
