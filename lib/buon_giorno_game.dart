@@ -1,5 +1,6 @@
 import 'package:flame_forge2d/flame_forge2d.dart'; // Forge2DGame
 import 'components/buon_giorno.dart'; // твой BuonGiorno
+import 'components/terrain/flat_ground.dart';
 
 class BuonGiornoGame extends Forge2DGame {
   BuonGiornoGame()
@@ -17,11 +18,15 @@ class BuonGiornoGame extends Forge2DGame {
   Future<void> onLoad() async {
     await super.onLoad();
 
-    // 1) Добавляем только игрока.
+    await add(FlatGround(startX: 50, length: 1000));
+
     player = BuonGiorno(
-      // spritePath: 'assets/images/bon_giorno.png', // оставь закомментированным, если спрайт не подключил
+      spritePath:
+          'buongiorno.webp', // оставь закомментированным, если спрайт не подключил
     );
     await add(player);
+
+    // camera.moveTo(player.body.position);
 
     // 2) Хочешь видеть, как прямоугольник ЕДЕТ вправо через экран — НЕ следуй камерой:
     // (оставь эти две строки закомментированными)
