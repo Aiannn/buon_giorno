@@ -18,7 +18,7 @@ class BuonGiornoGame extends Forge2DGame {
   Future<void> onLoad() async {
     await super.onLoad();
 
-    await add(FlatGround(startX: 50, length: 1000));
+    await add(FlatGround());
 
     player = BuonGiorno(
       spritePath:
