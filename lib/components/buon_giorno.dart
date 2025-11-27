@@ -15,9 +15,12 @@ final Vector2 kBonStart = Vector2(
 ); // стартовая позиция (центр тела на 0.05м выше поверхности)
 const Color kBonColor = Color(0xFF4FC3F7); // цвет заглушки
 
+// Категория игрока (для фильтров)
+const int kPlayerCat = 0x0004;
+
 /// MVP: кинематический BuonGiorno, едет вправо с постоянной скоростью.
 /// Никаких зависимостей от Terrain/Config — один файл, один класс.
-class BuonGiorno extends BodyComponent {
+class BuonGiorno extends BodyComponent with ContactCallbacks {
   BuonGiorno({this.spritePath});
 
   /// Путь к ассету (например, 'assets/images/bon_giorno.png').
@@ -37,6 +40,11 @@ class BuonGiorno extends BodyComponent {
   static const double _angleLerp = 0.15; // плавность поворота визуала
   double _timeAcc = 0.0;
   double _targetAngle = 0.0;
+
+  // ===== Grounded через сенсор-«ступню» =====
+  int _groundContacts = 0;
+  bool get isGrounded => _groundContacts > 0;
+  static const double _downForce = 50.0; // сила прижатия к земле
 
   @override
   Future<void> onLoad() async {
@@ -83,7 +91,26 @@ class BuonGiorno extends BodyComponent {
       FixtureDef(shape)
         ..density = 1.0
         ..friction = 0.9
-        ..restitution = 0.0,
+        ..restitution = 0.0
+        ..filter.categoryBits = kPlayerCat
+        ..filter.maskBits = 0xFFFF, // видим всех (в т.ч. kGroundCat)
+    );
+
+    // Сенсор-ступня (тонкая полоска под телом)
+    final foot =
+        PolygonShape()..setAsBox(
+          kBonWidth * 0.45, // почти во всю ширину
+          2.0, // тонкая
+          Vector2(0, kBonHeight / 2 + 1.0), // смещена чуть ниже низа корпуса
+          0,
+        );
+
+    body.createFixture(
+      FixtureDef(foot)
+        ..isSensor = true
+        ..userData = 'foot'
+        ..filter.categoryBits = kPlayerCat
+        ..filter.maskBits = 0xFFFF,
     );
 
     return body;
@@ -93,8 +120,16 @@ class BuonGiorno extends BodyComponent {
   void update(double dt) {
     super.update(dt);
     // Постоянная скорость вправо в метрах/сек
-    body.linearVelocity = Vector2(kBonSpeedX, body.linearVelocity.y);
+    final v = body.linearVelocity;
+    body.linearVelocity = Vector2(kBonSpeedX, v.y);
     // НИЧЕГО не синхронизируем для _visual здесь!
+
+    // Небольшая прижимка к земле, чтобы сгладить стыки
+    body.applyLinearImpulse(
+      Vector2(0, _downForce * dt),
+      point: body.worldCenter,
+      wake: true,
+    );
 
     // Периодический рейкаст вниз, чтобы узнать угол поверхности
     _timeAcc += dt;
@@ -113,6 +148,38 @@ class BuonGiorno extends BodyComponent {
     super.render(
       canvas,
     ); // белая форма + затем дети (уже с обновлёнными позицией/углом)
+  }
+
+  // ===== Контакты ступни =====
+  @override
+  void beginContact(Object other, Contact contact) {
+    final a = contact.fixtureA;
+    final b = contact.fixtureB;
+    final isFoot = (a.userData == 'foot') || (b.userData == 'foot');
+
+    // считаем «земля», если другая фикстура имеет категорию kGroundCat
+    final otherCat =
+        (a.userData == 'foot')
+            ? b.filterData.categoryBits
+            : a.filterData.categoryBits;
+    if (isFoot && (otherCat & kGroundCat) != 0) {
+      _groundContacts++;
+    }
+  }
+
+  @override
+  void endContact(Object other, Contact contact) {
+    final a = contact.fixtureA;
+    final b = contact.fixtureB;
+    final isFoot = (a.userData == 'foot') || (b.userData == 'foot');
+
+    final otherCat =
+        (a.userData == 'foot')
+            ? b.filterData.categoryBits
+            : a.filterData.categoryBits;
+    if (isFoot && (otherCat & kGroundCat) != 0) {
+      _groundContacts--;
+    }
   }
 
   void _sampleGroundAngle() {
