@@ -3,7 +3,7 @@ import 'dart:ui';
 import 'package:flame/components.dart';
 import 'package:flame/flame.dart';
 import 'package:flame_forge2d/flame_forge2d.dart';
-import 'terrain/flat_ground.dart' show kGroundCat;
+import 'terrain/procedural_terrain.dart' show kGroundCat;
 
 // ====== Топ-левел "конфиг" для BuonGiorno ======
 const double kBonWidth = 80; // м

@@ -1,6 +1,6 @@
 import 'package:flame_forge2d/flame_forge2d.dart'; // Forge2DGame
 import 'components/buon_giorno.dart'; // твой BuonGiorno
-import 'components/terrain/flat_ground.dart';
+import 'components/terrain/procedural_terrain.dart';
 
 class BuonGiornoGame extends Forge2DGame {
   BuonGiornoGame()
@@ -12,13 +12,30 @@ class BuonGiornoGame extends Forge2DGame {
         zoom: 14, // масштаб камеры (приближение)
       );
 
+  late final ProceduralTerrain terrain;
   late final BuonGiorno player;
 
   @override
   Future<void> onLoad() async {
     await super.onLoad();
 
-    await add(FlatGround());
+    // await add(FlatGround());
+
+    terrain = ProceduralTerrain(
+      startX: -600,
+      length: 5000,
+      stepX: 16,
+      baseY: 660,
+      ampBase: 130,
+      maxSlopeDeg: 22,
+      maxCurvDeg: 6,
+      seed: DateTime.now().millisecondsSinceEpoch, // или фиксируй
+      debugRender: true,
+    );
+    await add(terrain);
+
+    // final y0 = terrain.heightAt(0);
+    // final start = Vector2(0, y0 - (kBonHeight / 2) - 6.0);
 
     player = BuonGiorno(
       spritePath:
