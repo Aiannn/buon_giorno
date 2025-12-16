@@ -17,7 +17,7 @@ class ProceduralTerrain extends BodyComponent {
     this.length = 5000.0,
     this.stepX = 16.0, // дискретизация (чем меньше — тем плавнее/дороже)
     this.baseY = 660.0,
-    this.ampBase = 120.0, // базовая амплитуда холмов
+    this.ampBase = 500.0, // базовая амплитуда холмов
     this.maxSlopeDeg = 22.0, // ≈ комфортный предел для езды
     this.maxCurvDeg = 6.0, // предел изменения угла МЕЖДУ соседними сегментами
     this.friction = 0.95,
@@ -116,71 +116,62 @@ class ProceduralTerrain extends BodyComponent {
   // === Генерация профиля ===
 
   List<Vector2> _buildProfile() {
-    final n = (length / stepX).ceil();
+    // 1. Генерируем ключевые точки (раз в 120px)
+    final keyStep = 120.0;
+    final keyCount = (length / keyStep).ceil();
+    final keyPoints = <Vector2>[];
+    for (int i = 0; i <= keyCount; i++) {
+      final x = startX + i * keyStep;
+      // Новый шум для амплитуды
+      final ampNoise = 0.7 + 1.2 * (0.5 + 0.5 * _pEvt.getNoise2(x, 5000.0));
+      final amp = ampBase * ampNoise;
+      // Более низкая частота длинных волн
+      final yLong = amp * _pLong.getNoise2(x * 0.7, 0.0);
+      final yMid = 0.55 * amp * _pMid.getNoise2(x, 1000.0);
+      final yFine = 0.22 * amp * _pFine.getNoise2(x, -1000.0);
+      final y = baseY + (yLong + yMid + yFine);
+      keyPoints.add(Vector2(x, y));
+    }
+
+    // 2. Сэмплируем Catmull-Rom сплайн с шагом stepX
     final pts = <Vector2>[];
-    final maxDy = math.tan(maxSlopeDeg * math.pi / 180.0) * stepX;
-    final maxDTheta =
-        maxCurvDeg * math.pi / 180.0; // ограничение изменения угла
-
-    double lastY = baseY;
-    double lastTheta = 0.0; // угол между сегментами
-
-    // редкие “события”: плато / расширенные ямы
-    // генерим envelope: [-1..1] → [0..1], сглаживающий амплитуду
-    double _envelope(double x) {
-      final e = 0.5 + 0.5 * _pEvt.getNoise2(x, 0.0);
-      // чуть поджимаем края, чтобы реже были экстремумы
-      return 0.2 + 0.8 * e;
-    }
-
-    for (int i = 0; i <= n; i++) {
-      final x = startX + i * stepX;
-
-      // амплитуда варьируется медленно — «участки сложности»
-      final amp = ampBase * (0.6 + 0.8 * _envelope(x));
-
-      // базовая форма: длинная волна + мелкая "шероховатость"
-      final yLong = amp * _pLong.getNoise2(x, 0.0);
-      final yMid = 0.45 * amp * _pMid.getNoise2(x, 1000.0);
-      final yFine = 0.18 * amp * _pFine.getNoise2(x, -1000.0);
-
-      // редкие плато: когда envelope низкий — приглушаем производные
-      double yRaw = baseY + (yLong + yMid + yFine);
-
-      // slope clamp
-      double y = yRaw;
-      if (i > 0) {
-        double dy = yRaw - lastY;
-        if (dy > maxDy) y = lastY + maxDy;
-        if (dy < -maxDy) y = lastY - maxDy;
-
-        // curvature clamp: ограничиваем изменение угла между сегментами
-        final theta = math.atan2(y - lastY, stepX);
-        double dTheta = theta - lastTheta;
-        // нормализуем к [-pi, pi]
-        dTheta = (dTheta + math.pi) % (2 * math.pi) - math.pi;
-        if (dTheta > maxDTheta) {
-          // «сгладим» текущую точку по допустимой кривизне
-          final limited = lastTheta + maxDTheta;
-          final dyAllowed = math.tan(limited) * stepX;
-          y = lastY + dyAllowed;
-          lastTheta = limited;
-        } else if (dTheta < -maxDTheta) {
-          final limited = lastTheta - maxDTheta;
-          final dyAllowed = math.tan(limited) * stepX;
-          y = lastY + dyAllowed;
-          lastTheta = limited;
-        } else {
-          lastTheta = theta;
-        }
+    for (int i = 0; i < keyPoints.length - 1; i++) {
+      final p0 = keyPoints[i > 0 ? i - 1 : i];
+      final p1 = keyPoints[i];
+      final p2 = keyPoints[i + 1];
+      final p3 = keyPoints[i + 2 < keyPoints.length ? i + 2 : i + 1];
+      for (double t = 0; t < 1; t += stepX / keyStep) {
+        pts.add(_catmullRom(p0, p1, p2, p3, t));
       }
-      lastY = y;
-
-      pts.add(Vector2(x, y));
     }
+    pts.add(keyPoints.last);
 
-    // лёгкое упрощение, чтобы уменьшить кол-во рёбер
+    // 3. Упрощаем, чтобы не было лишних точек
     return _simplifyByDelta(pts, delta: 0.6);
+  }
+
+  Vector2 _catmullRom(
+    Vector2 p0,
+    Vector2 p1,
+    Vector2 p2,
+    Vector2 p3,
+    double t,
+  ) {
+    // t in [0, 1]
+    final t2 = t * t;
+    final t3 = t2 * t;
+    return Vector2(
+      0.5 *
+          ((2 * p1.x) +
+              (-p0.x + p2.x) * t +
+              (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
+              (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3),
+      0.5 *
+          ((2 * p1.y) +
+              (-p0.y + p2.y) * t +
+              (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
+              (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3),
+    );
   }
 
   List<Vector2> _simplifyByDelta(List<Vector2> src, {required double delta}) {
