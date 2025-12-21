@@ -15,10 +15,10 @@ class ProceduralTerrain extends BodyComponent {
   ProceduralTerrain({
     this.startX = -600.0,
     this.length = 5000.0,
-    this.stepX = 16.0, // дискретизация (чем меньше — тем плавнее/дороже)
+    this.stepX = 8.0, // дискретизация (чем меньше — тем плавнее/дороже)
     this.baseY = 660.0,
     this.ampBase = 500.0, // базовая амплитуда холмов
-    this.maxSlopeDeg = 22.0, // ≈ комфортный предел для езды
+    this.maxSlopeDeg = 75.0, // ≈ комфортный предел для езды
     this.maxCurvDeg = 6.0, // предел изменения угла МЕЖДУ соседними сегментами
     this.friction = 0.95,
     this.color = const Color(0xFFE3D0AF),
@@ -116,20 +116,26 @@ class ProceduralTerrain extends BodyComponent {
   // === Генерация профиля ===
 
   List<Vector2> _buildProfile() {
-    // 1. Генерируем ключевые точки (раз в 120px)
-    final keyStep = 120.0;
+    final keyStep = 120.0; // шаг ключевых точек Perlin (в пикселях)
     final keyCount = (length / keyStep).ceil();
     final keyPoints = <Vector2>[];
+    final rnd = math.Random(seed);
     for (int i = 0; i <= keyCount; i++) {
       final x = startX + i * keyStep;
-      // Новый шум для амплитуды
-      final ampNoise = 0.7 + 1.2 * (0.5 + 0.5 * _pEvt.getNoise2(x, 5000.0));
-      final amp = ampBase * ampNoise;
-      // Более низкая частота длинных волн
+      final amp = ampBase * 2.5;
       final yLong = amp * _pLong.getNoise2(x * 0.7, 0.0);
-      final yMid = 0.55 * amp * _pMid.getNoise2(x, 1000.0);
-      final yFine = 0.22 * amp * _pFine.getNoise2(x, -1000.0);
-      final y = baseY + (yLong + yMid + yFine);
+      final ampMid = ampBase * 0.5;
+      final yMid = ampMid * _pMid.getNoise2(x * 0.7, 0.0);
+      double y = baseY + yLong + yMid;
+      // Каждые 2-4 точки с шансом 10% делаем резкий перепад
+      if (i > 1 && i % (2 + rnd.nextInt(3)) == 0 && rnd.nextDouble() < 0.1) {
+        final offset =
+            rnd.nextBool()
+                ? rnd.nextInt(60) +
+                    80.0 // подъём
+                : -(rnd.nextInt(60) + 80.0); // спуск
+        y += offset;
+      }
       keyPoints.add(Vector2(x, y));
     }
 
@@ -140,14 +146,13 @@ class ProceduralTerrain extends BodyComponent {
       final p1 = keyPoints[i];
       final p2 = keyPoints[i + 1];
       final p3 = keyPoints[i + 2 < keyPoints.length ? i + 2 : i + 1];
+      // Уменьши шаг t (например, stepX / keyStep), чтобы точек было больше = выше плавность
       for (double t = 0; t < 1; t += stepX / keyStep) {
         pts.add(_catmullRom(p0, p1, p2, p3, t));
       }
     }
     pts.add(keyPoints.last);
-
-    // 3. Упрощаем, чтобы не было лишних точек
-    return _simplifyByDelta(pts, delta: 0.6);
+    return pts;
   }
 
   Vector2 _catmullRom(
@@ -172,28 +177,6 @@ class ProceduralTerrain extends BodyComponent {
               (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
               (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3),
     );
-  }
-
-  List<Vector2> _simplifyByDelta(List<Vector2> src, {required double delta}) {
-    if (src.length < 3) return src;
-    final out = <Vector2>[src.first];
-    for (int i = 1; i < src.length - 1; i++) {
-      final prev = out.last;
-      final curr = src[i];
-      final next = src[i + 1];
-      final d = _pointSegmentDistance(curr, prev, next);
-      if (d >= delta) out.add(curr);
-    }
-    out.add(src.last);
-    return out;
-  }
-
-  double _pointSegmentDistance(Vector2 p, Vector2 a, Vector2 b) {
-    final ap = p - a;
-    final ab = b - a;
-    final t = (ap.dot(ab) / ab.length2).clamp(0.0, 1.0);
-    final proj = a + ab * t;
-    return (p - proj).length;
   }
 
   Path _buildFillPath(List<Vector2> pts) {

@@ -1,16 +1,16 @@
-# buon_giorno
+# Buon_Giorno
 
-A new Flutter project.
+1. Что такое stepX?
+   В твоем коде stepX — это шаг финальной детализации сплайна.
 
-## Getting Started
+Как это работает: Сначала ты создаешь «ключевые точки» через каждые 120 пикселей (keyStep). Это просто точки в пространстве, между которыми гуляет ветер.
 
-This project is a starting point for a Flutter application.
+Затем в дело вступает Catmull-Rom. Он соединяет эти точки плавными кривыми.
 
-A few resources to get you started if this is your first Flutter project:
+Чтобы превратить эту абстрактную кривую в реальные сегменты (линии), по которым поедет машина, ты «нарезаешь» её на мелкие кусочки. Длина каждого такого кусочка по горизонтали — это и есть твой stepX.
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+Простыми словами: Если stepX = 16, то между двумя ключевыми точками (120 пикселей) будет создано примерно 7-8 маленьких физических отрезков. Если поставишь stepX = 4, их будет 30 — и дорога станет идеально гладкой, как стекло.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+---
+
+Крутизна гор будет зависеть только от твоей амплитуды (ampBase) и частоты шума Перлина. Если станет слишком круто и машина не сможет заехать — просто немного уменьши ampBase.
