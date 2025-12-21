@@ -17,8 +17,8 @@ class ProceduralTerrain extends BodyComponent {
     this.length = 5000.0,
     this.stepX = 8.0, // дискретизация (чем меньше — тем плавнее/дороже)
     this.baseY = 660.0,
-    this.ampBase = 500.0, // базовая амплитуда холмов
-    this.maxSlopeDeg = 75.0, // ≈ комфортный предел для езды
+    this.ampBase = 1500.0, // базовая амплитуда холмов
+    this.maxSlopeDeg = 85.0, // ≈ комфортный предел для езды
     this.maxCurvDeg = 6.0, // предел изменения угла МЕЖДУ соседними сегментами
     this.friction = 0.95,
     this.color = const Color(0xFFE3D0AF),
@@ -44,23 +44,24 @@ class ProceduralTerrain extends BodyComponent {
   Path? _cachedPath;
   late final Paint _paint = Paint()..color = color;
 
+  // === Генераторы шума (Классические октавы) ===
   // Перлин (детерминированно)
   late final PerlinNoise _pLong = PerlinNoise(
     seed: seed,
-    frequency: 0.002,
-  ); // длинные
+    frequency: 0.008,
+  ); // Самые длинные волны (основа рельефа)
   late final PerlinNoise _pMid = PerlinNoise(
     seed: seed ^ 11,
-    frequency: 0.006,
-  ); // средние
+    frequency: 0.025,
+  ); // Средние холмы (основной челлендж)
   late final PerlinNoise _pFine = PerlinNoise(
     seed: seed ^ 101,
-    frequency: 0.014,
-  ); // короткие
+    frequency: 0.06,
+  ); // Мелкие неровности (кочки для физики подвески)
   late final PerlinNoise _pEvt = PerlinNoise(
     seed: seed ^ 777,
     frequency: 0.0006,
-  ); // “события” (плато/ямы)
+  ); // Редкие события (если решишь добавить плато или ямы позже)
 
   @override
   Body createBody() {
@@ -127,14 +128,24 @@ class ProceduralTerrain extends BodyComponent {
     for (int i = 0; i <= keyCount; i++) {
       final x = startX + i * keyStep;
 
-      // Генерируем "желаемую" высоту.
-      // Frequency 0.001..0.002 дает классические холмы Hill Climb.
-      final noiseVal =
-          _pLong.getNoise2(x * 0.8, 0.0) +
-          (_pMid.getNoise2(x * 1.5, 0.0) *
-              0.2); // Добавляем немного мелких деталей
+      // --- ТРЕХСЛОЙНЫЙ ПЛАВНЫЙ ШУМ ---
 
-      double targetY = baseY + (ampBase * noiseVal);
+      // Слой 1: Большие пологие горы
+      final double n1 = _pLong.getNoise2(x, 0.0) * 1.0;
+
+      // Слой 2: Средние холмы
+      final double n2 = _pMid.getNoise2(x, 0.0) * 0.5;
+
+      // Слой 3: Мягкие кочки (минимальное влияние)
+      final double n3 = _pFine.getNoise2(x, 0.0) * 0.2;
+
+      // Суммируем слои. Поскольку мы не используем .abs(),
+      // значения плавно переходят из минуса в плюс, создавая округлые формы.
+      double combined = (n1 + n2 + n3);
+      combined = (combined * 2.0).clamp(-1.0, 1.0);
+
+      // Финальная высота без "усилителей" остроты
+      double targetY = baseY + (ampBase * combined);
 
       // 2. ПРИМЕНЯЕМ ГУАРДРАЙЛ (Вариант 1)
       if (i > 0) {
@@ -154,6 +165,7 @@ class ProceduralTerrain extends BodyComponent {
       final p2 = keyPoints[i + 1];
       final p3 = keyPoints[i + 2 < keyPoints.length ? i + 2 : i + 1];
       // Уменьши шаг t (например, stepX / keyStep), чтобы точек было больше = выше плавность
+      // stepX = 8.0 — это "золотой стандарт" для Forge2D
       for (double t = 0; t < 1; t += stepX / keyStep) {
         pts.add(_catmullRom(p0, p1, p2, p3, t));
       }
