@@ -119,24 +119,31 @@ class ProceduralTerrain extends BodyComponent {
     final keyStep = 120.0; // шаг ключевых точек Perlin (в пикселях)
     final keyCount = (length / keyStep).ceil();
     final keyPoints = <Vector2>[];
-    final rnd = math.Random(seed);
+
+    // 1. Константа максимального перепада (из тригонометрии: дельта Y = X * tg(угол))
+    // Мы вычисляем это один раз вне цикла.
+    final maxDeltaY = keyStep * math.tan(maxSlopeDeg * math.pi / 180.0);
+
     for (int i = 0; i <= keyCount; i++) {
       final x = startX + i * keyStep;
-      final amp = ampBase * 2.5;
-      final yLong = amp * _pLong.getNoise2(x * 0.7, 0.0);
-      final ampMid = ampBase * 0.5;
-      final yMid = ampMid * _pMid.getNoise2(x * 0.7, 0.0);
-      double y = baseY + yLong + yMid;
-      // Каждые 2-4 точки с шансом 10% делаем резкий перепад
-      if (i > 1 && i % (2 + rnd.nextInt(3)) == 0 && rnd.nextDouble() < 0.1) {
-        final offset =
-            rnd.nextBool()
-                ? rnd.nextInt(60) +
-                    80.0 // подъём
-                : -(rnd.nextInt(60) + 80.0); // спуск
-        y += offset;
+
+      // Генерируем "желаемую" высоту.
+      // Frequency 0.001..0.002 дает классические холмы Hill Climb.
+      final noiseVal =
+          _pLong.getNoise2(x * 0.8, 0.0) +
+          (_pMid.getNoise2(x * 1.5, 0.0) *
+              0.2); // Добавляем немного мелких деталей
+
+      double targetY = baseY + (ampBase * noiseVal);
+
+      // 2. ПРИМЕНЯЕМ ГУАРДРАЙЛ (Вариант 1)
+      if (i > 0) {
+        final prevY = keyPoints[i - 1].y;
+        // Ограничиваем targetY так, чтобы он не отклонялся от prevY больше чем на maxDeltaY
+        targetY = targetY.clamp(prevY - maxDeltaY, prevY + maxDeltaY);
       }
-      keyPoints.add(Vector2(x, y));
+
+      keyPoints.add(Vector2(x, targetY));
     }
 
     // 2. Сэмплируем Catmull-Rom сплайн с шагом stepX
