@@ -17,7 +17,7 @@ class ProceduralTerrain extends BodyComponent {
     this.length = 5000.0,
     this.stepX = 8.0, // дискретизация (чем меньше — тем плавнее/дороже)
     this.baseY = 660.0,
-    this.ampBase = 1500.0, // базовая амплитуда холмов
+    this.ampBase = 1200.0, // базовая амплитуда холмов
     this.maxSlopeDeg = 85.0, // ≈ комфортный предел для езды
     this.maxCurvDeg = 6.0, // предел изменения угла МЕЖДУ соседними сегментами
     this.friction = 0.95,
@@ -58,6 +58,10 @@ class ProceduralTerrain extends BodyComponent {
     seed: seed ^ 101,
     frequency: 0.06,
   ); // Мелкие неровности (кочки для физики подвески)
+  late final PerlinNoise _pGlobal = PerlinNoise(
+    seed: seed ^ 999,
+    frequency: 0.0005,
+  ); // Самый медленный шум в мире. Частота в 10 раз меньше основной.
   late final PerlinNoise _pEvt = PerlinNoise(
     seed: seed ^ 777,
     frequency: 0.0006,
@@ -121,36 +125,39 @@ class ProceduralTerrain extends BodyComponent {
     final keyCount = (length / keyStep).ceil();
     final keyPoints = <Vector2>[];
 
-    // 1. Константа максимального перепада (из тригонометрии: дельта Y = X * tg(угол))
-    // Мы вычисляем это один раз вне цикла.
-    final maxDeltaY = keyStep * math.tan(maxSlopeDeg * math.pi / 180.0);
+    // Увеличиваем лимит. При 80 градусах и шаге 150,
+    // гора может вырасти на 850 пикселей за ОДИН шаг.
+    final extremeSlope = 80.0;
+    final maxDeltaY = keyStep * math.tan(extremeSlope * math.pi / 180.0);
 
     for (int i = 0; i <= keyCount; i++) {
       final x = startX + i * keyStep;
 
       // --- ТРЕХСЛОЙНЫЙ ПЛАВНЫЙ ШУМ ---
 
-      // Слой 1: Большие пологие горы
-      final double n1 = _pLong.getNoise2(x, 0.0) * 1.0;
+      // 1. Глобальный наклон (меняет высоту горизонта на 2000 пикселей)
+      double globalShift = _pGlobal.getNoise2(x, 0.0) * 1000.0;
 
-      // Слой 2: Средние холмы
+      // 2. Основной шум
+      final double n1 = _pLong.getNoise2(x, 0.0) * 1.0;
       final double n2 = _pMid.getNoise2(x, 0.0) * 0.5;
 
-      // Слой 3: Мягкие кочки (минимальное влияние)
-      final double n3 = _pFine.getNoise2(x, 0.0) * 0.2;
+      double combined = (n1 + n2);
 
-      // Суммируем слои. Поскольку мы не используем .abs(),
-      // значения плавно переходят из минуса в плюс, создавая округлые формы.
-      double combined = (n1 + n2 + n3);
-      combined = (combined * 2.0).clamp(-1.0, 1.0);
+      // 3. ТРЮК: Экспоненциальный множитель
+      // Если combined > 0, мы его усиливаем. Это создаст глубокие каньоны.
+      // Если < 0, усиливаем в другую сторону. Это создаст высоченные пики.
+      double sensitivity = 2.5;
+      double sign = combined.sign;
+      double highDiff = math.pow(combined.abs(), 1.2) * sign;
 
-      // Финальная высота без "усилителей" остроты
-      double targetY = baseY + (ampBase * combined);
+      // Итоговая формула: База + Глобальный сдвиг + (Амплитуда * шум)
+      double targetY = (baseY + globalShift) + (ampBase * highDiff);
 
-      // 2. ПРИМЕНЯЕМ ГУАРДРАЙЛ (Вариант 1)
+      // 4. ГУАРДРАЙЛ (Жестко, но справедливо)
       if (i > 0) {
         final prevY = keyPoints[i - 1].y;
-        // Ограничиваем targetY так, чтобы он не отклонялся от prevY больше чем на maxDeltaY
+        // Если разница слишком велика, clamp превратит это в крутой склон
         targetY = targetY.clamp(prevY - maxDeltaY, prevY + maxDeltaY);
       }
 
