@@ -121,43 +121,56 @@ class ProceduralTerrain extends BodyComponent {
   // === Генерация профиля ===
 
   List<Vector2> _buildProfile() {
-    final keyStep = 120.0; // шаг ключевых точек Perlin (в пикселях)
+    final keyStep = 90.0;
     final keyCount = (length / keyStep).ceil();
     final keyPoints = <Vector2>[];
 
-    // Увеличиваем лимит. При 80 градусах и шаге 150,
-    // гора может вырасти на 850 пикселей за ОДИН шаг.
-    final extremeSlope = 80.0;
-    final maxDeltaY = keyStep * math.tan(extremeSlope * math.pi / 180.0);
+    final maxDeltaY = keyStep * math.tan(maxSlopeDeg * math.pi / 180.0);
 
     for (int i = 0; i <= keyCount; i++) {
       final x = startX + i * keyStep;
 
-      // --- ТРЕХСЛОЙНЫЙ ПЛАВНЫЙ ШУМ ---
+      // 1. Получаем чистый шум (-1.0 ... 1.0)
+      double globalNoise = _pGlobal.getNoise2(x, 0.0);
+      double n1 = _pLong.getNoise2(x, 0.0);
+      double n2 = _pMid.getNoise2(x, 0.0);
+      double n3 = _pFine.getNoise2(x, 0.0); // Используем для уступов
 
-      // 1. Глобальный наклон (меняет высоту горизонта на 2000 пикселей)
-      double globalShift = _pGlobal.getNoise2(x, 0.0) * 1000.0;
+      double combined = (n1 * 1.0 + n2 * 0.5);
 
-      // 2. Основной шум
-      final double n1 = _pLong.getNoise2(x, 0.0) * 1.0;
-      final double n2 = _pMid.getNoise2(x, 0.0) * 0.5;
+      // 2. АСИММЕТРИЯ (Горы vs Ямы)
+      double finalHeight;
+      if (combined < 0) {
+        // ГОРЫ: .toDouble() исправляет твою ошибку из скриншота
+        double sharpNoise = -math.pow(combined.abs(), 1.4).toDouble();
+        finalHeight = sharpNoise * ampBase * 1.5;
+      } else {
+        // ЯМЫ: делаем их неглубокими (max ~350 пикселей)
+        double shallowNoise = math.pow(combined.abs(), 1.1).toDouble();
+        finalHeight = shallowNoise * 350.0;
+      }
 
-      double combined = (n1 + n2);
+      // Умножаем глобальный шум здесь (асимметрично)
+      double shiftY = globalNoise < 0 ? globalNoise * 700 : globalNoise * 200;
+      double targetY = baseY + shiftY + finalHeight;
 
-      // 3. ТРЮК: Экспоненциальный множитель
-      // Если combined > 0, мы его усиливаем. Это создаст глубокие каньоны.
-      // Если < 0, усиливаем в другую сторону. Это создаст высоченные пики.
-      double sensitivity = 2.5;
-      double sign = combined.sign;
-      double highDiff = math.pow(combined.abs(), 1.2) * sign;
+      // 3. ЛОГИКА "УСТУПОВ" (Ledges)
+      // Если склон крутой (combined.abs() большой) И мелкий шум n3 высокий
+      if (i > 0 && combined.abs() > 0.3) {
+        // Если n3 попадает в диапазон, создаем "полку"
+        if (n3 > 0.6) {
+          // Вместо резкого прыжка, берем высоту предыдущей точки
+          targetY = keyPoints[i - 1].y;
+        }
+      }
 
-      // Итоговая формула: База + Глобальный сдвиг + (Амплитуда * шум)
-      double targetY = (baseY + globalShift) + (ampBase * highDiff);
+      // 4. ГРАНИЦЫ ЭКРАНА (Safe Zone)
+      // Не даем ямам уйти глубже 1050 пикселей
+      targetY = targetY.clamp(-3000.0, 1050.0);
 
-      // 4. ГУАРДРАЙЛ (Жестко, но справедливо)
+      // 5. ГУАРДРАЙЛ (Slope Clamp)
       if (i > 0) {
         final prevY = keyPoints[i - 1].y;
-        // Если разница слишком велика, clamp превратит это в крутой склон
         targetY = targetY.clamp(prevY - maxDeltaY, prevY + maxDeltaY);
       }
 
