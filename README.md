@@ -14,3 +14,7 @@ A few resources to get you started if this is your first Flutter project:
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
+
+НАДО
+сшивать чанки и запустить цикл и чтобы камера следила за бунджорно и чтобы сшивание было хорошо и чтобы удалялись ненужные предыдущие чанки и чтобы вовремя подгружались другие
+и так же решить вопрос что буонджорно застревает в текстуре большой горы
