@@ -8,11 +8,8 @@ import 'terrain/procedural_terrain.dart' show kGroundCat;
 // ====== Топ-левел "конфиг" для BuonGiorno ======
 const double kBonWidth = 80; // м
 const double kBonHeight = 100; // м
-const double kBonSpeedX = 40.0; // м/с вправо
-final Vector2 kBonStart = Vector2(
-  0,
-  (kBonHeight / 2 + 0.05),
-); // стартовая позиция (центр тела на 0.05м выше поверхности)
+const double kBonSpeedX = 80.0; // м/с вправо
+final Vector2 kBonStart = Vector2(0, 600); // стартовая позиция
 const Color kBonColor = Color(0xFF4FC3F7); // цвет заглушки
 
 /// MVP: кинематический BuonGiorno, едет вправо с постоянной скоростью.
